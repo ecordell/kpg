@@ -30,6 +30,16 @@ import (
 	"github.com/ecordell/kpg/pkg/signals"
 )
 
+type pullOptions struct {
+	outputDir string
+
+	configs  []string
+	username string
+	password string
+}
+
+var pullOpts pullOptions
+
 // pullCmd represents the pull command
 var pullCmd = &cobra.Command{
 	Use:   "pull",
@@ -43,15 +53,20 @@ to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := signals.Context()
 
-		if len(args) < 2  {
-			return fmt.Errorf("should be called with two args: host dir")
+		if len(args) < 1  {
+			return fmt.Errorf("should be called with  one arg: host")
 		}
 		host := args[0]
-		dir := args[1]
-		return bundle.Pull(ctx, host, dir)
+		resolver := newResolver(pushOpts.username, pushOpts.password, pushOpts.configs...)
+		return bundle.Pull(ctx, resolver, host, pullOpts.outputDir)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(pullCmd)
+
+	pullCmd.Flags().StringVarP(&pullOpts.outputDir, "out", "o", "", "directory to place files")
+	pullCmd.Flags().StringArrayVarP(&pullOpts.configs, "config", "c", []string{"~/.docker/config.json"}, "auth config path")
+	pullCmd.Flags().StringVarP(&pullOpts.username, "username", "u", "", "registry username")
+	pullCmd.Flags().StringVarP(&pullOpts.password, "password", "p", "", "registry password")
 }

@@ -24,12 +24,44 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
+	auth "github.com/deislabs/oras/pkg/auth/docker"
 	"github.com/spf13/cobra"
 
 	"github.com/ecordell/kpg/pkg/bundle"
 	"github.com/ecordell/kpg/pkg/signals"
 )
+
+type pushOptions struct {
+	configs  []string
+	username string
+	password string
+}
+
+var pushOpts pushOptions
+
+func newResolver(username, password string, configs ...string) remotes.Resolver {
+	if username != "" || password != "" {
+		return docker.NewResolver(docker.ResolverOptions{
+			Credentials: func(hostName string) (string, string, error) {
+				return username, password, nil
+			},
+		})
+	}
+	cli, err := auth.NewClient(configs...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Error loading auth file: %v\n", err)
+	}
+	resolver, err := cli.Resolver(context.Background())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Error loading resolver: %v\n", err)
+		resolver = docker.NewResolver(docker.ResolverOptions{})
+	}
+	return resolver
+}
 
 // pushCmd represents the push command
 var pushCmd = &cobra.Command{
@@ -55,10 +87,14 @@ to quickly create a Cobra application.`,
 		if err != nil {
 			return err
 		}
-		return bundle.Push(ctx, host, b)
+		resolver := newResolver(pushOpts.username, pushOpts.password, pushOpts.configs...)
+		return bundle.Push(ctx, resolver, host, b)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(pushCmd)
+	pushCmd.Flags().StringArrayVarP(&pushOpts.configs, "config", "c", []string{"~/.docker/config.json"}, "auth config path")
+	pushCmd.Flags().StringVarP(&pushOpts.username, "username", "u", "", "registry username")
+	pushCmd.Flags().StringVarP(&pushOpts.password, "password", "p", "", "registry password")
 }

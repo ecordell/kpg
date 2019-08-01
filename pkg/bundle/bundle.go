@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes"
 	"github.com/deislabs/oras/pkg/content"
 	"github.com/deislabs/oras/pkg/oras"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -99,9 +99,7 @@ func Build(ctx context.Context, dir string) (Bundle, error) {
 	return bundle, nil
 }
 
-func Push(ctx context.Context, ref string, b Bundle) error {
-	resolver := docker.NewResolver(docker.ResolverOptions{})
-
+func Push(ctx context.Context, resolver remotes.Resolver, ref string, b Bundle) error {
 	memoryStore := content.NewMemoryStore()
 	pushContents := []ocispec.Descriptor{}
 	for name, blob := range b {
@@ -116,9 +114,8 @@ func Push(ctx context.Context, ref string, b Bundle) error {
 	return nil
 }
 
-func Pull(ctx context.Context, ref, dir string) error {
+func Pull(ctx context.Context, resolver remotes.Resolver, ref, dir string) error {
 	fmt.Printf("Pulling from %s and saving...\n", ref)
-	resolver := docker.NewResolver(docker.ResolverOptions{})
 	fileStore := content.NewFileStore(dir)
 	defer fileStore.Close()
 	allowedMediaTypes := []string{string(MediaTypeKubeYaml), string(MediaTypeKustomizeYaml)}
